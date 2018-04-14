@@ -96,8 +96,9 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
   float w_b = 0.f;
   float w_c = 0.f;
 
-  float(*e0)[3] = nullptr;
-  float(*e1)[3] = nullptr;
+  float* e0 = nullptr;
+  float* e1 = nullptr;
+  float* e2 = nullptr;
 
   switch (region)
   {
@@ -118,14 +119,15 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
     break;
 
   case 1:   // 001 - outside ab; inside bc, ca;
-    w_a = 1.f;
-    w_b = 1.f;
+    w_a = -(BP[0] * AB[0] + BP[1] * AB[1] + BP[2] * AB[2]);
+    w_b = AP[0] * AB[0] + AP[1] * AB[1] + AP[2] * AB[2];
     break;
   case 2:   // 010 - outside bc; inside ab, ca;
-    w_b = 1.f;
-    w_c = 1.f;
+    w_b = -(CP[0] * BC[0] + CP[1] * BC[1] + CP[2] * BC[2]);
+    w_c = BP[0] * BC[0] + BP[1] * BC[1] + BP[2] * BC[2];
     break;
   case 4:   // 100 - outside ca; inside bc, ab;
+    e0 = AP;
     w_c = -(AP[0] * CA[0] + AP[1] * CA[1] + AP[2] * CA[2]);
     w_a = CP[0] * CA[0] + CP[1] * CA[1] + CP[2] * CA[2];
     break;
@@ -135,6 +137,11 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
     break;
   default:
     break;
+  }
+
+  if (e0) {
+
+
   }
 
   w_a = w_a < 0.f ? 0.f : w_a;
@@ -152,13 +159,13 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
 
 int main()
 {
-  const float A[3] = { 0.f, 0.f, 0.f };
-  const float B[3] = { 1.f, 0.f, 0.f };
-  const float C[3] = { 0.f, 1.f, 0.f };
+  const float A[3] = { -0.3f, -0.4f, -0.5f };
+  const float B[3] = { 0.9f, 0.9f, 0.1f };
+  const float C[3] = { -0.3f, 0.9f, -0.4f };
 
   const float r = 2.f;
-  const unsigned n = 10;
-  const unsigned m = 10;
+  const unsigned n = 40;
+  const unsigned m = 20;
 
 
   std::ofstream mat("dump.mtl");
