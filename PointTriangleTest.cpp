@@ -157,6 +157,123 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
 }
 
 
+unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&B)[3], const float(&C)[3], const float(&P)[3])
+{
+
+  float AP[3];
+  float BP[3];
+  float CP[3];
+  float N[3];
+  float AB[3];
+  float BC[3];
+  float CA[3];
+  for (unsigned i = 0; i < 3; i++) {
+    AP[i] = P[i] - A[i];
+    BP[i] = P[i] - B[i];
+    CP[i] = P[i] - C[i];
+
+    AB[i] = B[i] - A[i];
+    BC[i] = C[i] - B[i];
+    CA[i] = A[i] - C[i];
+  }
+
+  // Calc barycentric coords.
+  N[0] = AB[1] * BC[2] - AB[2] * BC[1];
+  N[1] = AB[2] * BC[0] - AB[0] * BC[2];
+  N[2] = AB[0] * BC[1] - AB[1] * BC[0];
+
+  float NxAB[3];
+  NxAB[0] = N[1] * AB[2] - N[2] * AB[1];
+  NxAB[1] = N[2] * AB[0] - N[0] * AB[2];
+  NxAB[2] = N[0] * AB[1] - N[1] * AB[0];
+  float AP_dot_NxAB =
+    AP[0] * NxAB[0] +
+    AP[1] * NxAB[1] +
+    AP[2] * NxAB[2];
+
+  float NxBC[3];
+  NxBC[0] = N[1] * BC[2] - N[2] * BC[1];
+  NxBC[1] = N[2] * BC[0] - N[0] * BC[2];
+  NxBC[2] = N[0] * BC[1] - N[1] * BC[0];
+  float BP_dot_NxBC =
+    BP[0] * NxBC[0] +
+    BP[1] * NxBC[1] +
+    BP[2] * NxBC[2];
+
+  float NxCA[3];
+  NxCA[0] = N[1] * CA[2] - N[2] * CA[1];
+  NxCA[1] = N[2] * CA[0] - N[0] * CA[2];
+  NxCA[2] = N[0] * CA[1] - N[1] * CA[0];
+  float CP_dot_NxCA =
+    CP[0] * NxCA[0] +
+    CP[1] * NxCA[1] +
+    CP[2] * NxCA[2];
+
+
+  uint32_t region = 0;
+  float w_a = 0.f;
+  float w_b = 0.f;
+  float w_c = 0.f;
+
+
+  const float* R = nullptr;
+  const float* S = nullptr;
+  const float* RS = nullptr;
+
+  bool out_ab = AP_dot_NxAB <= 0;
+  bool out_bc = BP_dot_NxBC <= 0;
+  bool out_ca = CP_dot_NxCA <= 0;
+
+  if (out_ab) {
+    region = 1;
+    R = A;
+    S = B;
+    RS = AB;
+  }
+  else if (out_bc) {
+    region = 2;
+    R = B;
+    S = C;
+    RS = BC;
+  }
+  else if (out_ca) {
+    region = 3;
+    R = C;
+    S = A;
+    RS = CA;
+  }
+  else {
+    w_a = BP_dot_NxBC;
+    w_b = CP_dot_NxCA;
+    w_c = AP_dot_NxAB;
+  }
+
+  if (R) {
+    float u = -((P[0] - S[0]) * RS[0] + (P[1] - S[1]) * RS[1] + (P[2] - S[2]) * RS[2]);
+    float v = (P[0] - R[0]) * RS[0] + (P[1] - R[1]) * RS[1] + (P[2] - R[2]) * RS[2];
+    u = u < 0.f ? 0.f : u;
+    v = v < 0.f ? 0.f : v;
+    float s = 1.f / (u + v);
+    for (unsigned i = 0; i < 3; i++) {
+      Q[i] = s * (u*R[i] + v * S[i]);
+    }
+  }
+  else {
+
+    w_a = w_a < 0.f ? 0.f : w_a;
+    w_b = w_b < 0.f ? 0.f : w_b;
+    w_c = w_c < 0.f ? 0.f : w_c;
+
+    float s = 1.f / (w_a + w_b + w_c);
+    for (unsigned i = 0; i < 3; i++) {
+      Q[i] = s * (w_a * A[i] + w_b * B[i] + w_c * C[i]);
+    }
+  }
+
+  return region;
+}
+
+
 int main()
 {
   const float A[3] = { -0.3f, -0.4f, -0.5f };
@@ -191,7 +308,7 @@ int main()
         r * std::cos(theta)
       };
       float Q[3];
-      auto region = nearestPointOnTriangle(Q, A, B, C, P);
+      auto region = nearestPointOnTriangle2(Q, A, B, C, P);
       out << "usemtl m" << ((region + 1) & 7) << "\n";
 
       out << "v " << Q[0] << ' ' << Q[1] << ' ' << Q[2] << '\n';
