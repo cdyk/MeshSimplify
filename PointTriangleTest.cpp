@@ -276,24 +276,24 @@ unsigned nearestPointOnTriangleSSE(float(&Q_)[3], const float(&A_)[3], const flo
   __m128 CAz = _mm_sub_ps(Az, Cz);
 
   //vecCross(N, AB, BC);
-  __m128 Nx = _mm_sub_ps(_mm_mul_ps(ABy, BCz), _mm_mul_ps(ABz, BCy));
-  __m128 Ny = _mm_sub_ps(_mm_mul_ps(ABz, BCx), _mm_mul_ps(ABx, BCz));
-  __m128 Nz = _mm_sub_ps(_mm_mul_ps(ABx, BCy), _mm_mul_ps(ABy, BCx));
+  __m128 Nx = _mm_fmsub_ps(ABy, BCz, _mm_mul_ps(ABz, BCy));
+  __m128 Ny = _mm_fmsub_ps(ABz, BCx, _mm_mul_ps(ABx, BCz));
+  __m128 Nz = _mm_fmsub_ps(ABx, BCy, _mm_mul_ps(ABy, BCx));
 
   // vecCross(NxAB, N, AB);
-  __m128 NxABx = _mm_sub_ps(_mm_mul_ps(Ny, ABz), _mm_mul_ps(Nz, ABy));
-  __m128 NxABy = _mm_sub_ps(_mm_mul_ps(Nz, ABx), _mm_mul_ps(Nx, ABz));
-  __m128 NxABz = _mm_sub_ps(_mm_mul_ps(Nx, ABy), _mm_mul_ps(Ny, ABx));
+  __m128 NxABx = _mm_fmsub_ps(Ny, ABz, _mm_mul_ps(Nz, ABy));
+  __m128 NxABy = _mm_fmsub_ps(Nz, ABx, _mm_mul_ps(Nx, ABz));
+  __m128 NxABz = _mm_fmsub_ps(Nx, ABy, _mm_mul_ps(Ny, ABx));
 
   //vecCross(NxBC, N, BC);
-  __m128 NxBCx = _mm_sub_ps(_mm_mul_ps(Ny, BCz), _mm_mul_ps(Nz, BCy));
-  __m128 NxBCy = _mm_sub_ps(_mm_mul_ps(Nz, BCx), _mm_mul_ps(Nx, BCz));
-  __m128 NxBCz = _mm_sub_ps(_mm_mul_ps(Nx, BCy), _mm_mul_ps(Ny, BCx));
+  __m128 NxBCx = _mm_fmsub_ps(Ny, BCz, _mm_mul_ps(Nz, BCy));
+  __m128 NxBCy = _mm_fmsub_ps(Nz, BCx, _mm_mul_ps(Nx, BCz));
+  __m128 NxBCz = _mm_fmsub_ps(Nx, BCy, _mm_mul_ps(Ny, BCx));
 
   //vecCross(NxCA, N, CA);
-  __m128 NxCAx = _mm_sub_ps(_mm_mul_ps(Ny, CAz), _mm_mul_ps(Nz, CAy));
-  __m128 NxCAy = _mm_sub_ps(_mm_mul_ps(Nz, CAx), _mm_mul_ps(Nx, CAz));
-  __m128 NxCAz = _mm_sub_ps(_mm_mul_ps(Nx, CAy), _mm_mul_ps(Ny, CAx));
+  __m128 NxCAx = _mm_fmsub_ps(Ny, CAz, _mm_mul_ps(Nz, CAy));
+  __m128 NxCAy = _mm_fmsub_ps(Nz, CAx, _mm_mul_ps(Nx, CAz));
+  __m128 NxCAz = _mm_fmsub_ps(Nx, CAy, _mm_mul_ps(Ny, CAx));
 
   // -- per-point loop 
 
