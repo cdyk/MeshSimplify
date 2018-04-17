@@ -26,6 +26,12 @@ float vecDot(const Vec3& A, const Vec3& B)
   return A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
 }
 
+template<typename T>
+T mask(bool cond, const T V)
+{
+  return cond ? V : T(0);
+}
+
 //N[0] = u[1]v[2] - u[2]v[1];
 //N[1] = u[2]v[0] - u[0]v[2];
 //N[2] = u[0]v[1] - u[1]v[0];
@@ -180,8 +186,6 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
 
 unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&B)[3], const float(&C)[3], const float(&P)[3])
 {
-
-
   float AB[3], BC[3], CA[3];
   vecSub(AB, B, A);
   vecSub(BC, C, B);
@@ -195,8 +199,6 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   vecCross(NxBC, N, BC);
   vecCross(NxCA, N, CA);
 
-
-
   float AP[3], BP[3], CP[3];
   vecSub(AP, P, A);
   vecSub(BP, P, B);
@@ -206,46 +208,22 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   float CP_dot_NxCA = vecDot(CP, NxCA);
 
   float AP_dot_AB = vecDot(AP, AB);
-  float BP_dot_AB = vecDot(BP, AB);
   float BP_dot_BC = vecDot(BP, BC);
-  float CP_dot_BC = vecDot(CP, BC);
   float CP_dot_CA = vecDot(CP, CA);
-  float AP_dot_CA = vecDot(AP, CA);
 
-  uint32_t region = 0;
-  float w_a = 0.f;
-  float w_b = 0.f;
-  float w_c = 0.f;
-
-
-  const float* R = nullptr;
-  const float* S = nullptr;
-  const float* RS = nullptr;
+  float neg_BP_dot_AB = -vecDot(BP, AB);
+  float neg_CP_dot_BC = -vecDot(CP, BC);
+  float neg_AP_dot_CA = -vecDot(AP, CA);
 
   bool out_ab = AP_dot_NxAB <= 0;
-  bool out_bc = BP_dot_NxBC <= 0;
-  bool out_ca = CP_dot_NxCA <= 0;
+  bool out_bc = !out_ab && BP_dot_NxBC <= 0;
+  bool out_ca = !(out_ab||out_bc) && CP_dot_NxCA <= 0;
+  bool out_none = !(out_ab || out_bc || out_ca);
 
-  if (out_ab) {
-    region = 1;
-    w_a = -BP_dot_AB;
-    w_b = AP_dot_AB;
-  }
-  else if (out_bc) {
-    region = 2;
-    w_b = -CP_dot_BC;
-    w_c = BP_dot_BC;
-  }
-  else if (out_ca) {
-    region = 3;
-    w_c = -AP_dot_CA;
-    w_a = CP_dot_CA;
-  }
-  else {
-    w_a = BP_dot_NxBC;
-    w_b = CP_dot_NxCA;
-    w_c = AP_dot_NxAB;
-  }
+  uint32_t region = mask(out_ab, 1) + mask(out_bc, 2) + mask(out_ca, 3);
+  float w_a = mask(out_ab, neg_BP_dot_AB) + mask(out_ca, CP_dot_CA) + mask(out_none, BP_dot_NxBC);
+  float w_b = mask(out_ab, AP_dot_AB) + mask(out_bc, neg_CP_dot_BC) + mask(out_none, CP_dot_NxCA);
+  float w_c = mask(out_bc, BP_dot_BC) + mask(out_ca, neg_AP_dot_CA) + mask(out_none, AP_dot_NxAB);
 
   w_a = w_a < 0.f ? 0.f : w_a;
   w_b = w_b < 0.f ? 0.f : w_b;
