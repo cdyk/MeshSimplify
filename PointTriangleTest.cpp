@@ -5,6 +5,27 @@
 #include <cassert>
 #include <string>
 
+typedef float Vec3[3];
+
+void vecSub(Vec3 & D, const Vec3& A, const Vec3& B)
+{
+  D[0] = A[0] - B[0];
+  D[1] = A[1] - B[1];
+  D[2] = A[2] - B[2];
+}
+
+void vecCross(Vec3& D, const Vec3& A, const Vec3& B)
+{
+  D[0] = A[1] * B[2] - A[2] * B[1];
+  D[1] = A[2] * B[0] - A[0] * B[2];
+  D[2] = A[0] * B[1] - A[1] * B[0];
+}
+
+float vecDot(const Vec3& A, const Vec3& B)
+{
+  return A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
+}
+
 //N[0] = u[1]v[2] - u[2]v[1];
 //N[1] = u[2]v[0] - u[0]v[2];
 //N[2] = u[0]v[1] - u[1]v[0];
@@ -160,55 +181,36 @@ unsigned nearestPointOnTriangle(float(&Q)[3], const float(&A)[3], const float(&B
 unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&B)[3], const float(&C)[3], const float(&P)[3])
 {
 
-  float AP[3];
-  float BP[3];
-  float CP[3];
+
+  float AB[3], BC[3], CA[3];
+  vecSub(AB, B, A);
+  vecSub(BC, C, B);
+  vecSub(CA, A, C);
+
   float N[3];
-  float AB[3];
-  float BC[3];
-  float CA[3];
-  for (unsigned i = 0; i < 3; i++) {
-    AP[i] = P[i] - A[i];
-    BP[i] = P[i] - B[i];
-    CP[i] = P[i] - C[i];
+  vecCross(N, AB, BC);
 
-    AB[i] = B[i] - A[i];
-    BC[i] = C[i] - B[i];
-    CA[i] = A[i] - C[i];
-  }
+  float NxAB[3], NxBC[3], NxCA[3];
+  vecCross(NxAB, N, AB);
+  vecCross(NxBC, N, BC);
+  vecCross(NxCA, N, CA);
 
-  // Calc barycentric coords.
-  N[0] = AB[1] * BC[2] - AB[2] * BC[1];
-  N[1] = AB[2] * BC[0] - AB[0] * BC[2];
-  N[2] = AB[0] * BC[1] - AB[1] * BC[0];
 
-  float NxAB[3];
-  NxAB[0] = N[1] * AB[2] - N[2] * AB[1];
-  NxAB[1] = N[2] * AB[0] - N[0] * AB[2];
-  NxAB[2] = N[0] * AB[1] - N[1] * AB[0];
-  float AP_dot_NxAB =
-    AP[0] * NxAB[0] +
-    AP[1] * NxAB[1] +
-    AP[2] * NxAB[2];
 
-  float NxBC[3];
-  NxBC[0] = N[1] * BC[2] - N[2] * BC[1];
-  NxBC[1] = N[2] * BC[0] - N[0] * BC[2];
-  NxBC[2] = N[0] * BC[1] - N[1] * BC[0];
-  float BP_dot_NxBC =
-    BP[0] * NxBC[0] +
-    BP[1] * NxBC[1] +
-    BP[2] * NxBC[2];
+  float AP[3], BP[3], CP[3];
+  vecSub(AP, P, A);
+  vecSub(BP, P, B);
+  vecSub(CP, P, C);
+  float AP_dot_NxAB = vecDot(AP, NxAB);
+  float BP_dot_NxBC = vecDot(BP, NxBC);
+  float CP_dot_NxCA = vecDot(CP, NxCA);
 
-  float NxCA[3];
-  NxCA[0] = N[1] * CA[2] - N[2] * CA[1];
-  NxCA[1] = N[2] * CA[0] - N[0] * CA[2];
-  NxCA[2] = N[0] * CA[1] - N[1] * CA[0];
-  float CP_dot_NxCA =
-    CP[0] * NxCA[0] +
-    CP[1] * NxCA[1] +
-    CP[2] * NxCA[2];
-
+  float AP_dot_AB = vecDot(AP, AB);
+  float BP_dot_AB = vecDot(BP, AB);
+  float BP_dot_BC = vecDot(BP, BC);
+  float CP_dot_BC = vecDot(CP, BC);
+  float CP_dot_CA = vecDot(CP, CA);
+  float AP_dot_CA = vecDot(AP, CA);
 
   uint32_t region = 0;
   float w_a = 0.f;
@@ -226,21 +228,18 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
 
   if (out_ab) {
     region = 1;
-    R = A;
-    S = B;
-    RS = AB;
+    w_a = -BP_dot_AB;
+    w_b = AP_dot_AB;
   }
   else if (out_bc) {
     region = 2;
-    R = B;
-    S = C;
-    RS = BC;
+    w_b = -CP_dot_BC;
+    w_c = BP_dot_BC;
   }
   else if (out_ca) {
     region = 3;
-    R = C;
-    S = A;
-    RS = CA;
+    w_c = -AP_dot_CA;
+    w_a = CP_dot_CA;
   }
   else {
     w_a = BP_dot_NxBC;
@@ -248,26 +247,13 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
     w_c = AP_dot_NxAB;
   }
 
-  if (R) {
-    float u = -((P[0] - S[0]) * RS[0] + (P[1] - S[1]) * RS[1] + (P[2] - S[2]) * RS[2]);
-    float v = (P[0] - R[0]) * RS[0] + (P[1] - R[1]) * RS[1] + (P[2] - R[2]) * RS[2];
-    u = u < 0.f ? 0.f : u;
-    v = v < 0.f ? 0.f : v;
-    float s = 1.f / (u + v);
-    for (unsigned i = 0; i < 3; i++) {
-      Q[i] = s * (u*R[i] + v * S[i]);
-    }
-  }
-  else {
+  w_a = w_a < 0.f ? 0.f : w_a;
+  w_b = w_b < 0.f ? 0.f : w_b;
+  w_c = w_c < 0.f ? 0.f : w_c;
 
-    w_a = w_a < 0.f ? 0.f : w_a;
-    w_b = w_b < 0.f ? 0.f : w_b;
-    w_c = w_c < 0.f ? 0.f : w_c;
-
-    float s = 1.f / (w_a + w_b + w_c);
-    for (unsigned i = 0; i < 3; i++) {
-      Q[i] = s * (w_a * A[i] + w_b * B[i] + w_c * C[i]);
-    }
+  float s = 1.f / (w_a + w_b + w_c);
+  for (unsigned i = 0; i < 3; i++) {
+    Q[i] = s * (w_a * A[i] + w_b * B[i] + w_c * C[i]);
   }
 
   return region;
