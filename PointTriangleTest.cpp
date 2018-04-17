@@ -5,6 +5,9 @@
 #include <cassert>
 #include <string>
 
+#include "xmmintrin.h"
+#include "immintrin.h"
+
 typedef float Vec3[3];
 
 void vecSub(Vec3 & D, const Vec3& A, const Vec3& B)
@@ -237,12 +240,144 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   return region;
 }
 
+unsigned nearestPointOnTriangleSSE(float(&Q_)[3], const float(&A_)[3], const float(&B_)[3], const float(&C_)[3], const float(&P_)[3])
+{
+  __m128 Ax = _mm_load_ps(A_);  // A.x A.y A.z of triangle 0
+  __m128 Ay = _mm_load_ps(A_);  // A.x A.y A.z of triangle 1
+  __m128 Az = _mm_load_ps(A_);  // A.x A.y A.z of triangle 2
+  __m128 At = _mm_load_ps(A_);  // A.x A.y A.z of triangle 3
+  _MM_TRANSPOSE4_PS(Ax, Ay, Az, At);
+
+  __m128 Bx = _mm_load_ps(B_);
+  __m128 By = _mm_load_ps(B_);
+  __m128 Bz = _mm_load_ps(B_);
+  __m128 Bt = _mm_load_ps(B_);
+  _MM_TRANSPOSE4_PS(Bx, By, Bz, Bt);
+
+  __m128 Cx = _mm_load_ps(C_);
+  __m128 Cy = _mm_load_ps(C_);
+  __m128 Cz = _mm_load_ps(C_);
+  __m128 Ct = _mm_load_ps(C_);
+  _MM_TRANSPOSE4_PS(Cx, Cy, Cz, Ct);
+
+  //vecSub(AB, B, A);
+  __m128 ABx = _mm_sub_ps(Bx, Ax);
+  __m128 ABy = _mm_sub_ps(By, Ay);
+  __m128 ABz = _mm_sub_ps(Bz, Az);
+
+  //vecSub(BC, C, B);
+  __m128 BCx = _mm_sub_ps(Cx, Bx);
+  __m128 BCy = _mm_sub_ps(Cy, By);
+  __m128 BCz = _mm_sub_ps(Cz, Bz);
+
+  //vecSub(CA, A, C);
+  __m128 CAx = _mm_sub_ps(Ax, Cx);
+  __m128 CAy = _mm_sub_ps(Ay, Cy);
+  __m128 CAz = _mm_sub_ps(Az, Cz);
+
+  //vecCross(N, AB, BC);
+  __m128 Nx = _mm_sub_ps(_mm_mul_ps(ABy, BCz), _mm_mul_ps(ABz, BCy));
+  __m128 Ny = _mm_sub_ps(_mm_mul_ps(ABz, BCx), _mm_mul_ps(ABx, BCz));
+  __m128 Nz = _mm_sub_ps(_mm_mul_ps(ABx, BCy), _mm_mul_ps(ABy, BCx));
+
+  // vecCross(NxAB, N, AB);
+  __m128 NxABx = _mm_sub_ps(_mm_mul_ps(Ny, ABz), _mm_mul_ps(Nz, ABy));
+  __m128 NxABy = _mm_sub_ps(_mm_mul_ps(Nz, ABx), _mm_mul_ps(Nx, ABz));
+  __m128 NxABz = _mm_sub_ps(_mm_mul_ps(Nx, ABy), _mm_mul_ps(Ny, ABx));
+
+  //vecCross(NxBC, N, BC);
+  __m128 NxBCx = _mm_sub_ps(_mm_mul_ps(Ny, BCz), _mm_mul_ps(Nz, BCy));
+  __m128 NxBCy = _mm_sub_ps(_mm_mul_ps(Nz, BCx), _mm_mul_ps(Nx, BCz));
+  __m128 NxBCz = _mm_sub_ps(_mm_mul_ps(Nx, BCy), _mm_mul_ps(Ny, BCx));
+
+  //vecCross(NxCA, N, CA);
+  __m128 NxCAx = _mm_sub_ps(_mm_mul_ps(Ny, CAz), _mm_mul_ps(Nz, CAy));
+  __m128 NxCAy = _mm_sub_ps(_mm_mul_ps(Nz, CAx), _mm_mul_ps(Nx, CAz));
+  __m128 NxCAz = _mm_sub_ps(_mm_mul_ps(Nx, CAy), _mm_mul_ps(Ny, CAx));
+
+  // -- per-point loop 
+
+  __m128 signbit = _mm_set_ps1(-0.f);
+
+  __m128 Pt = _mm_loadu_ps(P_);
+  __m128 Px = _mm_shuffle_ps(Pt, Pt, _MM_SHUFFLE(0, 0, 0, 0));
+  __m128 Py = _mm_shuffle_ps(Pt, Pt, _MM_SHUFFLE(1, 1, 1, 1));
+  __m128 Pz = _mm_shuffle_ps(Pt, Pt, _MM_SHUFFLE(2, 2, 2, 2));
+
+  //vecSub(AP, P, A);
+  __m128 APx = _mm_sub_ps(Px, Ax);
+  __m128 APy = _mm_sub_ps(Py, Ay);
+  __m128 APz = _mm_sub_ps(Pz, Az);
+  __m128 AP_dot_NxAB = _mm_fmadd_ps(APx, NxABx, _mm_fmadd_ps(APy, NxABy, _mm_mul_ps(APz, NxABz)));
+  __m128 AP_dot_AB = _mm_fmadd_ps(APx, ABx, _mm_fmadd_ps(APy, ABy, _mm_mul_ps(APz, ABz)));
+  __m128 neg_AP_dot_CA = _mm_xor_ps(signbit, _mm_fmadd_ps(APx, CAx, _mm_fmadd_ps(APy, CAy, _mm_mul_ps(APz, CAz))));
+
+  //vecSub(BP, P, B);
+  __m128 BPx = _mm_sub_ps(Px, Bx);
+  __m128 BPy = _mm_sub_ps(Py, By);
+  __m128 BPz = _mm_sub_ps(Pz, Bz);
+  __m128 BP_dot_NxBC = _mm_fmadd_ps(BPx, NxBCx, _mm_fmadd_ps(BPy, NxBCy, _mm_mul_ps(BPz, NxBCz)));
+  __m128 BP_dot_BC = _mm_fmadd_ps(BPx, BCx, _mm_fmadd_ps(BPy, BCy, _mm_mul_ps(BPz, BCz)));
+  __m128 neg_BP_dot_AB = _mm_xor_ps(signbit, _mm_fmadd_ps(BPx, ABx, _mm_fmadd_ps(BPy, ABy, _mm_mul_ps(BPz, ABz))));
+
+  //vecSub(CP, P, C);
+  __m128 CPx = _mm_sub_ps(Px, Cx);
+  __m128 CPy = _mm_sub_ps(Py, Cy);
+  __m128 CPz = _mm_sub_ps(Pz, Cz);
+  __m128 CP_dot_NxCA = _mm_fmadd_ps(CPx, NxCAx, _mm_fmadd_ps(CPy, NxCAy, _mm_mul_ps(CPz, NxCAz)));
+  __m128 CP_dot_CA = _mm_fmadd_ps(CPx, CAx, _mm_fmadd_ps(CPy, CAy, _mm_mul_ps(CPz, CAz)));
+  __m128 neg_CP_dot_BC = _mm_xor_ps(signbit, _mm_fmadd_ps(CPx, BCx, _mm_fmadd_ps(CPy, BCy, _mm_mul_ps(CPz, BCz))));
+
+  __m128 out_ab = _mm_cmple_ps(AP_dot_NxAB, _mm_setzero_ps());
+  __m128 out_bc = _mm_andnot_ps(out_ab, _mm_cmple_ps(BP_dot_NxBC, _mm_setzero_ps()));
+  __m128 out_ab_bc = _mm_or_ps(out_ab, out_bc);
+  __m128 out_ca = _mm_andnot_ps(out_ab_bc, _mm_cmple_ps(CP_dot_NxCA, _mm_setzero_ps()));
+  __m128 out_ab_bc_ca = _mm_or_ps(_mm_or_ps(out_ab, out_bc), out_ca);
+  // out_none = !out_ab_bc_ca
+
+  __m128i region = _mm_or_si128(_mm_and_si128(_mm_castps_si128(out_ab), _mm_set1_epi32(1)),
+                                _mm_or_si128(_mm_and_si128(_mm_castps_si128(out_bc), _mm_set1_epi32(2)),
+                                             _mm_and_si128(_mm_castps_si128(out_ca), _mm_set1_epi32(3))));
+
+  __m128 w_a = _mm_add_ps(_mm_and_ps(out_ab, neg_BP_dot_AB),
+                          _mm_add_ps(_mm_and_ps(out_ca, CP_dot_CA),
+                                     _mm_andnot_ps(out_ab_bc_ca, BP_dot_NxBC)));
+  __m128 w_b = _mm_add_ps(_mm_and_ps(out_ab, AP_dot_AB),
+                          _mm_add_ps(_mm_and_ps(out_bc, neg_CP_dot_BC),
+                                     _mm_andnot_ps(out_ab_bc_ca, CP_dot_NxCA)));
+  __m128 w_c = _mm_add_ps(_mm_and_ps(out_bc, BP_dot_BC),
+                          _mm_add_ps(_mm_and_ps(out_ca, neg_AP_dot_CA),
+                                     _mm_andnot_ps(out_ab_bc_ca, AP_dot_NxAB)));
+
+  w_a = _mm_max_ps(w_a, _mm_setzero_ps());
+  w_b = _mm_max_ps(w_b, _mm_setzero_ps());
+  w_c = _mm_max_ps(w_c, _mm_setzero_ps());
+
+  __m128 s = _mm_rcp_ps(_mm_add_ps(w_a, _mm_add_ps(w_b, w_c)));
+
+  __m128 Qx = _mm_mul_ps(s, _mm_fmadd_ps(w_a, Ax, _mm_fmadd_ps(w_b, Bx, _mm_mul_ps(w_c, Cx))));
+  __m128 Qy = _mm_mul_ps(s, _mm_fmadd_ps(w_a, Ay, _mm_fmadd_ps(w_b, By, _mm_mul_ps(w_c, Cy))));
+  __m128 Qz = _mm_mul_ps(s, _mm_fmadd_ps(w_a, Az, _mm_fmadd_ps(w_b, Bz, _mm_mul_ps(w_c, Cz))));
+
+  Q_[0] = Qx.m128_f32[0];
+  Q_[1] = Qy.m128_f32[0];
+  Q_[2] = Qz.m128_f32[0];
+
+  return region.m128i_i32[0];
+}
+
 
 int main()
 {
-  const float A[3] = { -0.3f, -0.4f, -0.5f };
-  const float B[3] = { 0.9f, 0.9f, 0.1f };
-  const float C[3] = { -0.3f, 0.9f, -0.4f };
+  const float V[][3] = 
+  {
+    { -0.3f, -0.4f, -0.5f },
+    { 0.9f, 0.9f, 0.1f },
+    { -0.3f, 0.9f, -0.4f }
+  };
+
+  const uint32_t ix[3] = { 0, 1, 2 };
+
 
   const float r = 2.f;
   const unsigned n = 40;
@@ -261,10 +396,14 @@ int main()
   std::ofstream out("dump.obj");
   out << "mtllib dump.mtl\n";
 
+  const auto & A = V[ix[0]];
+  const auto & B = V[ix[1]];
+  const auto & C = V[ix[2]];
+
   for (unsigned j = 0; j < m; j++) {
     for (unsigned i = 0; i < n; i++) {
-      auto theta = (float(M_PI)*j) / m;
-      auto phi = (float(2.0*M_PI)*i) / n;
+      auto theta = (float(M_PI)*j + 0.5f) / m;
+      auto phi = (float(2.0*M_PI)*i + 0.5f) / n;
 
       const float P[3] = {
         r * std::sin(theta)*std::cos(phi),
@@ -272,7 +411,8 @@ int main()
         r * std::cos(theta)
       };
       float Q[3];
-      auto region = nearestPointOnTriangle2(Q, A, B, C, P);
+      //auto region = nearestPointOnTriangle2(Q, A, B, C, P);
+      auto region = nearestPointOnTriangleSSE(Q, A, B, C, P);
       out << "usemtl m" << ((region + 1) & 7) << "\n";
 
       out << "v " << Q[0] << ' ' << Q[1] << ' ' << Q[2] << '\n';
