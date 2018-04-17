@@ -328,10 +328,10 @@ unsigned nearestPointOnTriangleSSE(float(&Q_)[3], const float(&A_)[3], const flo
   __m128 CP_dot_CA = _mm_fmadd_ps(CPx, CAx, _mm_fmadd_ps(CPy, CAy, _mm_mul_ps(CPz, CAz)));
   __m128 neg_CP_dot_BC = _mm_xor_ps(signbit, _mm_fmadd_ps(CPx, BCx, _mm_fmadd_ps(CPy, BCy, _mm_mul_ps(CPz, BCz))));
 
-  __m128 out_ab = _mm_cmple_ps(AP_dot_NxAB, _mm_setzero_ps());
-  __m128 out_bc = _mm_andnot_ps(out_ab, _mm_cmple_ps(BP_dot_NxBC, _mm_setzero_ps()));
+  __m128 out_ab = _mm_cmplt_ps(AP_dot_NxAB, _mm_setzero_ps());
+  __m128 out_bc = _mm_andnot_ps(out_ab, _mm_cmplt_ps(BP_dot_NxBC, _mm_setzero_ps()));
   __m128 out_ab_bc = _mm_or_ps(out_ab, out_bc);
-  __m128 out_ca = _mm_andnot_ps(out_ab_bc, _mm_cmple_ps(CP_dot_NxCA, _mm_setzero_ps()));
+  __m128 out_ca = _mm_andnot_ps(out_ab_bc, _mm_cmplt_ps(CP_dot_NxCA, _mm_setzero_ps()));
   __m128 out_ab_bc_ca = _mm_or_ps(_mm_or_ps(out_ab, out_bc), out_ca);
   // out_none = !out_ab_bc_ca
 
@@ -356,6 +356,14 @@ unsigned nearestPointOnTriangleSSE(float(&Q_)[3], const float(&A_)[3], const flo
   w_c = _mm_max_ps(w_c, _mm_setzero_ps());
 
   __m128 s = _mm_rcp_ps(_mm_add_ps(w_a, _mm_add_ps(w_b, w_c)));
+
+  __m128 degenerate = _mm_cmpeq_ps(s, _mm_set1_ps(std::numeric_limits<float>::infinity()));
+  if (_mm_movemask_ps(degenerate)) {  // probably quite unlikely, so it might beneficial to skip here. do profile.
+    s = _mm_blendv_ps(s, _mm_set_ps1(1.f), degenerate);
+    w_a = _mm_blendv_ps(s, _mm_set_ps1(1.f/3.f), degenerate);
+    w_b = _mm_blendv_ps(s, _mm_set_ps1(1.f / 3.f), degenerate);
+    w_c = _mm_blendv_ps(s, _mm_set_ps1(1.f / 3.f), degenerate);
+  }
 
   __m128 Qx = _mm_mul_ps(s, _mm_fmadd_ps(w_a, Ax, _mm_fmadd_ps(w_b, Bx, _mm_mul_ps(w_c, Cx))));
   __m128 Qy = _mm_mul_ps(s, _mm_fmadd_ps(w_a, Ay, _mm_fmadd_ps(w_b, By, _mm_mul_ps(w_c, Cy))));
