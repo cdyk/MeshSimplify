@@ -335,19 +335,21 @@ unsigned nearestPointOnTriangleSSE(float(&Q_)[3], const float(&A_)[3], const flo
   __m128 out_ab_bc_ca = _mm_or_ps(_mm_or_ps(out_ab, out_bc), out_ca);
   // out_none = !out_ab_bc_ca
 
-  __m128i region = _mm_or_si128(_mm_and_si128(_mm_castps_si128(out_ab), _mm_set1_epi32(1)),
-                                _mm_or_si128(_mm_and_si128(_mm_castps_si128(out_bc), _mm_set1_epi32(2)),
-                                             _mm_and_si128(_mm_castps_si128(out_ca), _mm_set1_epi32(3))));
+  __m128 region = _mm_blendv_ps(_mm_blendv_ps(_mm_and_ps(_mm_set_ps1(1), out_ab),
+                                              _mm_set_ps1(2), out_bc),
+                                _mm_set_ps1(3), out_ca);
 
-  __m128 w_a = _mm_add_ps(_mm_and_ps(out_ab, neg_BP_dot_AB),
-                          _mm_add_ps(_mm_and_ps(out_ca, CP_dot_CA),
-                                     _mm_andnot_ps(out_ab_bc_ca, BP_dot_NxBC)));
-  __m128 w_b = _mm_add_ps(_mm_and_ps(out_ab, AP_dot_AB),
-                          _mm_add_ps(_mm_and_ps(out_bc, neg_CP_dot_BC),
-                                     _mm_andnot_ps(out_ab_bc_ca, CP_dot_NxCA)));
-  __m128 w_c = _mm_add_ps(_mm_and_ps(out_bc, BP_dot_BC),
-                          _mm_add_ps(_mm_and_ps(out_ca, neg_AP_dot_CA),
-                                     _mm_andnot_ps(out_ab_bc_ca, AP_dot_NxAB)));
+  __m128 w_a = _mm_blendv_ps(_mm_blendv_ps(_mm_andnot_ps(out_ab_bc_ca, BP_dot_NxBC),
+                                           CP_dot_CA, out_ca),
+                             neg_BP_dot_AB, out_ab);
+
+  __m128 w_b = _mm_blendv_ps(_mm_blendv_ps(_mm_andnot_ps(out_ab_bc_ca, CP_dot_NxCA),
+                                           neg_CP_dot_BC, out_bc),
+                             AP_dot_AB, out_ab);
+
+  __m128 w_c = _mm_blendv_ps(_mm_blendv_ps(_mm_andnot_ps(out_ab_bc_ca, AP_dot_NxAB),
+                                           neg_AP_dot_CA, out_ca),
+                             BP_dot_BC, out_bc);
 
   w_a = _mm_max_ps(w_a, _mm_setzero_ps());
   w_b = _mm_max_ps(w_b, _mm_setzero_ps());
@@ -363,7 +365,7 @@ unsigned nearestPointOnTriangleSSE(float(&Q_)[3], const float(&A_)[3], const flo
   Q_[1] = Qy.m128_f32[0];
   Q_[2] = Qz.m128_f32[0];
 
-  return region.m128i_i32[0];
+  return region.m128_f32[0];
 }
 
 
