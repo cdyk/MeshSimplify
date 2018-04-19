@@ -225,9 +225,31 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   float neg_CP_dot_BC = -vecDot(CP, BC);
   float neg_AP_dot_CA = -vecDot(AP, CA);
 
-  bool out_ab = AP_dot_NxAB <= 0;
-  bool out_bc = !out_ab && BP_dot_NxBC <= 0;
-  bool out_ca = !(out_ab||out_bc) && CP_dot_NxCA <= 0;
+  bool AP_dot_AB_p = 0.f <= AP_dot_AB;
+  bool BP_dot_BC_p = 0.f <= BP_dot_BC;
+  bool CP_dot_CA_p = 0.f <= CP_dot_CA;
+
+  bool AP_dot_NxAB_n = AP_dot_NxAB <= 0.f;
+  bool BP_dot_NxBC_n = BP_dot_NxBC <= 0.f;
+  bool CP_dot_NxCA_n = CP_dot_NxCA <= 0.f;
+
+  bool neg_AP_dot_CA_n = neg_AP_dot_CA <= 0.f;
+  bool neg_BP_dot_AB_n = neg_BP_dot_AB <= 0.f;
+  bool neg_CP_dot_BC_n = neg_CP_dot_BC <= 0.f;
+
+  bool edge_ab = AP_dot_AB_p ? AP_dot_NxAB_n && !neg_BP_dot_AB_n : neg_AP_dot_CA_n;
+  bool edge_bc = BP_dot_BC_p ? BP_dot_NxBC_n && !neg_CP_dot_BC_n : neg_BP_dot_AB_n; 
+  bool edge_ca = CP_dot_CA_p ? CP_dot_NxCA_n && !neg_AP_dot_CA_n : neg_CP_dot_BC_n;
+
+  // can we prove this?
+  assert(!edge_ab || edge_ab && !edge_bc && !edge_ca);
+  assert(!edge_bc || edge_bc && !edge_ca && !edge_ab);
+  assert(!edge_ca || edge_ca && !edge_ab && !edge_bc);
+
+  bool out_ab = edge_ab;
+  bool out_bc = !out_ab && edge_bc;
+  bool out_ca = !(out_ab || out_bc) && edge_ca;
+
   bool out_none = !(out_ab || out_bc || out_ca);
 
   uint32_t region = mask(out_ab, 1) + mask(out_bc, 2) + mask(out_ca, 3);
@@ -397,9 +419,9 @@ int main()
 {
   const float V[][3] = 
   {
+    { 0.2f, 0.15f, 0.0f },
+  {  0.9f, -0.15f, 0.0f },
     { -0.9f, -0.15f, 0.0f },
-    { 0.9f, -0.15f, 0.0f },
-    { 0.0f, 0.15f, 0.0f }
   };
 
   const uint32_t ix[3] = { 0, 1, 2 };
