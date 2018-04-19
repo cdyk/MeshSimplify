@@ -29,6 +29,13 @@ float vecDot(const Vec3& A, const Vec3& B)
   return A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
 }
 
+float vecDist(const Vec3& A, const Vec3& B)
+{
+  float t[3];
+  vecSub(t, A, B);
+  return vecDot(t, t);
+}
+
 template<typename T>
 T mask(bool cond, const T V)
 {
@@ -224,18 +231,27 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   bool out_none = !(out_ab || out_bc || out_ca);
 
   uint32_t region = mask(out_ab, 1) + mask(out_bc, 2) + mask(out_ca, 3);
-  float w_a = mask(out_ab, neg_BP_dot_AB) + mask(out_ca, CP_dot_CA) + mask(out_none, BP_dot_NxBC);
-  float w_b = mask(out_ab, AP_dot_AB) + mask(out_bc, neg_CP_dot_BC) + mask(out_none, CP_dot_NxCA);
-  float w_c = mask(out_bc, BP_dot_BC) + mask(out_ca, neg_AP_dot_CA) + mask(out_none, AP_dot_NxAB);
+  float w_a_ = mask(out_ab, neg_BP_dot_AB) + mask(out_ca, CP_dot_CA) + mask(out_none, BP_dot_NxBC);
+  float w_b_ = mask(out_ab, AP_dot_AB) + mask(out_bc, neg_CP_dot_BC) + mask(out_none, CP_dot_NxCA);
+  float w_c_ = mask(out_bc, BP_dot_BC) + mask(out_ca, neg_AP_dot_CA) + mask(out_none, AP_dot_NxAB);
 
-  w_a = w_a < 0.f ? 0.f : w_a;
-  w_b = w_b < 0.f ? 0.f : w_b;
-  w_c = w_c < 0.f ? 0.f : w_c;
+  float w_a = w_a_ < 0.f ? 0.f : w_a_;
+  float w_b = w_b_ < 0.f ? 0.f : w_b_;
+  float w_c = w_c_ < 0.f ? 0.f : w_c_;
 
   float s = 1.f / (w_a + w_b + w_c);
   for (unsigned i = 0; i < 3; i++) {
     Q[i] = s * (w_a * A[i] + w_b * B[i] + w_c * C[i]);
   }
+
+  float pq = vecDist(P, Q);
+  float pa = vecDist(P, A);
+  float pb = vecDist(P, B);
+  float pc = vecDist(P, C);
+
+  //assert(pq <= pa*1.1f);
+  //assert(pq <= pb*1.1f);
+  //assert(pq <= pc*1.1f);
 
   return region;
 }
@@ -381,9 +397,9 @@ int main()
 {
   const float V[][3] = 
   {
-    { -0.3f, -0.4f, -0.5f },
-    { 0.9f, 0.9f, 0.1f },
-    { -0.3f, 0.9f, -0.4f }
+    { -0.9f, -0.15f, 0.0f },
+    { 0.9f, -0.15f, 0.0f },
+    { 0.0f, 0.15f, 0.0f }
   };
 
   const uint32_t ix[3] = { 0, 1, 2 };
@@ -421,8 +437,8 @@ int main()
         r * std::cos(theta)
       };
       float Q[3];
-      //auto region = nearestPointOnTriangle2(Q, A, B, C, P);
-      auto region = nearestPointOnTriangleSSE(Q, A, B, C, P);
+      auto region = nearestPointOnTriangle2(Q, A, B, C, P);
+      //auto region = nearestPointOnTriangleSSE(Q, A, B, C, P);
       out << "usemtl m" << ((region + 1) & 7) << "\n";
 
       out << "v " << Q[0] << ' ' << Q[1] << ' ' << Q[2] << '\n';
