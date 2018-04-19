@@ -241,11 +241,6 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   bool edge_bc = BP_dot_BC_p ? BP_dot_NxBC_n && !neg_CP_dot_BC_n : neg_BP_dot_AB_n; 
   bool edge_ca = CP_dot_CA_p ? CP_dot_NxCA_n && !neg_AP_dot_CA_n : neg_CP_dot_BC_n;
 
-  // can we prove this?
-  assert(!edge_ab || edge_ab && !edge_bc && !edge_ca);
-  assert(!edge_bc || edge_bc && !edge_ca && !edge_ab);
-  assert(!edge_ca || edge_ca && !edge_ab && !edge_bc);
-
   bool out_ab = edge_ab;
   bool out_bc = !out_ab && edge_bc;
   bool out_ca = !(out_ab || out_bc) && edge_ca;
@@ -262,6 +257,11 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   float w_c = w_c_ < 0.f ? 0.f : w_c_;
 
   float s = 1.f / (w_a + w_b + w_c);
+  if (std::isinf(s)) {
+    s = w_a = 1.f;
+    w_b = w_c = 0.f;
+  }
+
   for (unsigned i = 0; i < 3; i++) {
     Q[i] = s * (w_a * A[i] + w_b * B[i] + w_c * C[i]);
   }
@@ -271,9 +271,9 @@ unsigned nearestPointOnTriangle2(float(&Q)[3], const float(&A)[3], const float(&
   float pb = vecDist(P, B);
   float pc = vecDist(P, C);
 
-  //assert(pq <= pa*1.1f);
-  //assert(pq <= pb*1.1f);
-  //assert(pq <= pc*1.1f);
+  assert(pq <= pa * (1 + 1e-5f));
+  assert(pq <= pb * (1 + 1e-5f));
+  assert(pq <= pc * (1 + 1e-5f));
 
   return region;
 }
@@ -419,8 +419,8 @@ int main()
 {
   const float V[][3] = 
   {
-    { 0.2f, 0.15f, 0.0f },
-  {  0.9f, -0.15f, 0.0f },
+    {  0.2f,  0.15f, 0.0f },
+    {  0.9f, -0.15f, 0.0f },
     { -0.9f, -0.15f, 0.0f },
   };
 
